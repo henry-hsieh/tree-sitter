@@ -24,6 +24,7 @@ jobs:
         - linux-arm64       #
         - linux-arm         #
         - linux-x64         #
+        - linux-x64-musl    #
         - linux-x86         #
         - linux-powerpc64   #
         - windows-arm64     #
@@ -39,6 +40,7 @@ jobs:
         - { platform: linux-arm64       , target: aarch64-unknown-linux-gnu           , os: ubuntu-latest  , use-cross: true    }
         - { platform: linux-arm         , target: arm-unknown-linux-gnueabi           , os: ubuntu-latest  , use-cross: true    }
         - { platform: linux-x64         , target: x86_64-unknown-linux-gnu            , os: ubuntu-20.04   , cli_features: wasm } #2272
+        - { platform: linux-x64-musl    , target: x86_64-unknown-linux-musl           , os: ubuntu-latest  , use-cross: true    }
         - { platform: linux-x86         , target: i686-unknown-linux-gnu              , os: ubuntu-latest  , use-cross: true    }
         - { platform: linux-powerpc64   , target: powerpc64-unknown-linux-gnu         , os: ubuntu-latest  , use-cross: true    }
         - { platform: windows-arm64     , target: aarch64-pc-windows-msvc             , os: windows-latest                      }
@@ -50,6 +52,7 @@ jobs:
         # Cross compilers for C library
         - { platform: linux-arm64       , cc: aarch64-linux-gnu-gcc             , ar: aarch64-linux-gnu-ar           }
         - { platform: linux-arm         , cc: arm-linux-gnueabi-gcc             , ar: arm-linux-gnueabi-ar           }
+        - { platform: linux-x64-musl    , cc: x86_64-linux-musl-gcc             , ar: x86_64-linux-musl-ar           }
         - { platform: linux-x86         , cc: i686-linux-gnu-gcc                , ar: i686-linux-gnu-ar              }
         - { platform: linux-powerpc64   , cc: powerpc64-linux-gnu-gcc           , ar: powerpc64-linux-gnu-ar         }
 
@@ -127,6 +130,10 @@ jobs:
         [ -n "$CC" ] && echo "CC=$CC" >> $GITHUB_ENV
         [ -n "$AR" ] && echo "AR=$AR" >> $GITHUB_ENV
 
+        if [ "$TARGET" =~ "musl" ]; then
+          echo "CFLAGS=-static" >> $GITHUB_ENV
+        fi
+
         if [ "$USE_CROSS" == "true" ]; then
           echo "BUILD_CMD=cross" >> $GITHUB_ENV
           runner=$(BUILD_CMD=cross cross.sh bash -c "env | sed -nr '/^CARGO_TARGET_.*_RUNNER=/s///p'")
@@ -141,7 +148,9 @@ jobs:
       if: ${{ !matrix.cli-only && !matrix.use-cross }} # No sense to build on the same Github runner hosts many times
       run: script/build-wasm
 
-    - run: $BUILD_CMD build --release --target=${{ matrix.target }} --features=${{ matrix.cli_features }}
+    - run: CFLAGS=$CFLAGS $BUILD_CMD build --release --target=${{ matrix.target }} --features=${{ matrix.cli_features }}
+      env:
+        CFLAGS: -static
 
     - run: script/fetch-fixtures
 
